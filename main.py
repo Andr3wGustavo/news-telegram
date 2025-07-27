@@ -22,6 +22,7 @@ async def enviar_mensagem_teste():
         print(f"Ocorreu um erro: {e}")
 
 if __name__ == "__main__":
-    # Executa a função assíncrona
+    
     asyncio.run(enviar_mensagem_teste())
+
 
