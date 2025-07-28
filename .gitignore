@@ -1,7 +1,9 @@
 # Ambiente Virtual
 venv/
 __pycache__/
+links_enviados.txt
 *.pyc
 
 # Arquivos de configuração local (se houver)
 .env
+config.py
