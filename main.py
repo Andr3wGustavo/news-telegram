@@ -123,14 +123,17 @@ async def ciclo_de_verificacao(bot, config):
         if not noticias_para_sincronizar:
             print("Nenhuma notícia encontrada para sincronizar. Memória já está atualizada.")
             await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text="🤖 **Oráculo Informa:**\n\nMemória já está em dia. Nenhuma notícia nova para sincronizar.")
-            return
+        else:
+            for _, _, link in noticias_para_sincronizar:
+                salvar_link_enviado(link)
+            
+            print(f"{len(noticias_para_sincronizar)} notícias foram adicionadas à memória sem envio.")
+            await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=f"🤖 **Oráculo Informa:**\n\nSincronização completa. {len(noticias_para_sincronizar)} notícias do passado foram arquivadas. A partir de agora, apenas o futuro será notificado.")
         
-        for _, _, link in noticias_para_sincronizar:
-            salvar_link_enviado(link)
-        
-        print(f"{len(noticias_para_sincronizar)} notícias foram adicionadas à memória sem envio.")
-        await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=f"🤖 **Oráculo Informa:**\n\nSincronização completa. {len(noticias_para_sincronizar)} notícias do passado foram arquivadas. A partir de agora, apenas o futuro será notificado.")
-        return
+        # Transforma o modo para o restante da sessão
+        config['mode'] = 'standard'
+        print("--- MODO DE OPERAÇÃO ALTERADO PARA 'PADRÃO' PARA OS PRÓXIMOS CICLOS ---")
+        return # Finaliza este ciclo, que foi apenas para sincronização.
 
     # Modos 1 e 2: Início Padrão ou com Tempo
     time_gate = None
