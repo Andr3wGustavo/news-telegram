@@ -36,10 +36,6 @@ def salvar_link_enviado(link):
 
 # --- FUNÇÕES DE PROCESSAMENTO DE NOTÍCIA ---
 def extrair_texto_artigo(url):
-<<<<<<< HEAD
-=======
-
->>>>>>> c094e47993142bebd992c53d03987cd173e4b4ee
     try:
         headers = {'User-Agent': USER_AGENT}
         response = requests.get(url, headers=headers, timeout=15)
@@ -53,23 +49,8 @@ def extrair_texto_artigo(url):
         print(f"### ERRO ao extrair texto de {url}: {e} ###")
         return None
 
-<<<<<<< HEAD
 def resumir_com_ia(prompt):
     """Função genérica para enviar um prompt para a IA."""
-=======
-def resumir_com_ia(texto_artigo, titulo):
-    
-    if not texto_artigo:
-        return "Não foi possível extrair o conteúdo para resumir."
-    prompt = f"""
-    Analise a seguinte notícia com o título "{titulo}".
-    Destile a informação em seus pontos mais essenciais e críticos.
-    Me forneça um resumo conciso e direto em 3 a 5 bullet points (usando •).
-    Seja direto e foque no impacto e na informação chave.
-    Notícia:
-    {texto_artigo[:8000]}
-    """
->>>>>>> c094e47993142bebd992c53d03987cd173e4b4ee
     try:
         print("-> Enviando para análise do Gemini...")
         response = model.generate_content(prompt)
@@ -257,11 +238,6 @@ def mostrar_menu_e_obter_config():
         elif escolha_busca == '3':
             config['mode'] = 'sync'
             break
-<<<<<<< HEAD
-=======
-        elif escolha == '9':
-            return None 
->>>>>>> c094e47993142bebd992c53d03987cd173e4b4ee
         else:
             print("  Opção inválida.")
 
@@ -303,3 +279,4 @@ if __name__ == "__main__":
         print("\n>>> Bot encerrado pelo usuário. <<<")
     except Exception as e:
         print(f"\n!!! Ocorreu um erro fatal: {e} !!!")
+
