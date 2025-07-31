@@ -4,6 +4,9 @@ __pycache__/
 links_enviados.txt
 *.pyc
 
+
+
+
 # config files
 .env
 config.py
