@@ -35,7 +35,7 @@ def salvar_link_enviado(link):
 
 # --- FUNÇÕES DE PROCESSAMENTO DE NOTÍCIA ---
 def extrair_texto_artigo(url):
-    # (Esta função não muda)
+
     try:
         headers = {'User-Agent': USER_AGENT}
         response = requests.get(url, headers=headers, timeout=10)
@@ -50,7 +50,7 @@ def extrair_texto_artigo(url):
         return None
 
 def resumir_com_ia(texto_artigo, titulo):
-    # (Esta função não muda)
+    
     if not texto_artigo:
         return "Não foi possível extrair o conteúdo para resumir."
     prompt = f"""
@@ -186,7 +186,7 @@ def mostrar_menu_e_obter_config():
             config['mode'] = 'sync'
             break
         elif escolha == '9':
-            return None # Sinal para sair
+            return None 
         else:
             print("Opção inválida. Tente novamente.")
 
