@@ -9,4 +9,4 @@ __pycache__/
 
 # config files
 .env
-
+config.py
