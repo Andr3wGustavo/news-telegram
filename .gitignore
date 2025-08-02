@@ -1,7 +1,7 @@
 # enviroment
 venv/
 __pycache__/
-links_enviados.txt
+
 *.pyc
 
 
@@ -9,4 +9,4 @@ links_enviados.txt
 
 # config files
 .env
-config.py
+
