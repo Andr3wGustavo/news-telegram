@@ -10,10 +10,10 @@ from config import TELEGRAM_TOKEN, TELEGRAM_CHAT_ID, GEMINI_API_KEY, RSS_FEEDS
 from datetime import datetime, timezone, timedelta
 
 # --- CONFIGURAÇÃO ---
-TELEGRAM_MAX_LEN = 4096 # Limite de caracteres do Telegram
 ARQUIVO_MEMORIA = "links_enviados.txt"
 INTERVALO_VERIFICACAO = 3600  # 1 hora
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+TELEGRAM_MAX_LEN = 4096 # Limite de caracteres do Telegram
 
 # Configura a API do Gemini
 genai.configure(api_key=GEMINI_API_KEY)
@@ -84,55 +84,49 @@ def buscar_noticias_novas(links_ja_enviados, time_gate=None):
             noticias_novas.append({'source': nome_fonte, 'title': noticia.title, 'link': noticia.link})
     return noticias_novas
 
-
 async def enviar_mensagem(bot, mensagem_texto):
     """Função genérica para enviar qualquer mensagem para o Telegram, dividindo se necessário."""
     if len(mensagem_texto) <= TELEGRAM_MAX_LEN:
         try:
             await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=mensagem_texto, parse_mode='Markdown')
+            await asyncio.sleep(1)
+            return
         except Exception as e:
             print(f"### ERRO ao enviar com Markdown: {e} ###")
             print("--- Tentando enviar como texto simples ---")
             try:
                 await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=mensagem_texto)
+                await asyncio.sleep(1)
+                return
             except Exception as e2:
                 print(f"### ERRO ao enviar como texto simples: {e2} ###")
-        finally:
-            await asyncio.sleep(1)
-    else:
-        print(f"--- MENSAGEM MUITO LONGA ({len(mensagem_texto)} caracteres). Dividindo em partes. ---")
-        partes = []
-        parte_atual = ""
-        linhas = mensagem_texto.split('\n')
-        for linha in linhas:
-            if len(parte_atual) + len(linha) + 1 > TELEGRAM_MAX_LEN:
-                partes.append(parte_atual)
-                parte_atual = ""
-            parte_atual += linha + "\n"
-        
-        if parte_atual:
-            partes.append(parte_atual)
+                if "too long" not in str(e2).lower():
+                    return
 
-        for i, parte in enumerate(partes):
-            header = f"**(Parte {i+1}/{len(partes)})**\n"
-            if i > 0:
-                parte_com_header = header + parte
-            else:
-                parte_com_header = parte
+    print(f"--- MENSAGEM MUITO LONGA ({len(mensagem_texto)} caracteres). Dividindo em partes. ---")
+    partes = []
+    chunk_size = TELEGRAM_MAX_LEN - 100
+    
+    for i in range(0, len(mensagem_texto), chunk_size):
+        partes.append(mensagem_texto[i:i + chunk_size])
 
-            print(f"Enviando parte {i+1}/{len(partes)}...")
+    for i, parte in enumerate(partes):
+        if len(partes) > 1:
+            parte_com_header = f"**(Parte {i+1}/{len(partes)})**\n\n{parte}"
+        else:
+            parte_com_header = parte
+
+        print(f"Enviando parte {i+1}/{len(partes)}...")
+        try:
+            await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=parte_com_header, parse_mode='Markdown')
+        except Exception as e:
+            print(f"### ERRO ao enviar parte com Markdown: {e} ###")
             try:
-                await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=parte_com_header, parse_mode='Markdown')
-            except Exception as e:
-                print(f"### ERRO ao enviar parte com Markdown: {e} ###")
-                try:
-                    await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=parte_com_header)
-                except Exception as e2:
-                    print(f"### ERRO ao enviar parte como texto simples: {e2} ###")
-            finally:
-                await asyncio.sleep(2) # Delay maior entre partes
-
-
+                await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=parte_com_header)
+            except Exception as e2:
+                print(f"### ERRO FATAL ao enviar parte como texto simples: {e2} ###")
+        finally:
+            await asyncio.sleep(2)
 
 async def ciclo_de_verificacao(bot, config):
     print("\n--- Iniciando novo ciclo de verificação ---")
@@ -169,32 +163,31 @@ async def ciclo_de_verificacao(bot, config):
             for i, noticia in enumerate(noticias_para_processar):
                 print(f"Extraindo texto da notícia {i+1}/{len(noticias_para_processar)}: {noticia['title']}")
                 texto_artigo = extrair_texto_artigo(noticia['link'])
-                # **FIX 1: Resiliência contra erro 403**
                 if texto_artigo:
                     batch_content += f"--- Notícia {i+1} ---\nFonte: {noticia['source']}\nTítulo: {noticia['title']}\nConteúdo: {texto_artigo[:1500]}\n\n"
                 else:
-                    # Fallback: Usa apenas o título se a extração falhar
                     batch_content += f"--- Notícia {i+1} (Conteúdo bloqueado/indisponível) ---\nFonte: {noticia['source']}\nTítulo: {noticia['title']}\n\n"
             
             if not batch_content:
                 print("Não foi possível obter títulos ou conteúdo de nenhuma notícia para o relatório.")
-                return8
+                return
 
             prompt_lote = f"""
-            Você é um analista de inteligência. A seguir está um dossiê de notícias. Algumas podem ter o conteúdo completo, outras apenas o título. Sua tarefa é criar um único "Relatório de Inteligência" conciso baseado na informação disponível.
-            1.  **Síntese Geral:** Comece com um parágrafo curto que resuma o cenário geral.
-            1.1 **para cada noticia que julgar importante, seja mais detalhista**
-            1.2 **preciso que foque nas coisas revolucionarias e pegue os LANCAMENTOS e novidades em um parte separada, como nome de cada sigla**
-            1.3 **selecione as 7 principais noticias, e seja mais especifico quando for resumilas**
+            Você é um analista de inteligência. A seguir está um dossiê de notícias. Sua tarefa é criar um único "Relatório de Inteligência" conciso.
+
+            1.  **Síntese Geral:** Comece com um parágrafo curto que resuma o cenário geral das notícias.
+            1.1 **Para cada notícia que julgar importante, seja mais detalhista.**
+            1.2 **Preciso que foque nas coisas revolucionárias e pegue os LANÇAMENTOS e novidades em uma parte separada, como nome de cada sigla.**
+            1.3 **Selecione as 7 principais notícias, e seja mais específico quando for resumi-las.**
             2.  **Temas Principais:** Identifique de 5 a 15 temas recorrentes. Para cada tema, liste os pontos chave em bullet points (•).
             3.  **Conexões e Implicações:** Aponte conexões entre as notícias ou possíveis implicações de cada uma.
+            
             Seja direto, analítico e foque no que é mais importante.
             --- Dossiê de Notícias ---
             {batch_content}
             """
             resumo_geral = resumir_com_ia(prompt_lote)
-            # **FIX 2: Prevenção de erro de Markdown**
-            mensagem_final = f"🧠 **RELATÓRIO DE INTELIGÊNCIA DO ORÁCULO** 🧠\n\n```\n{resumo_geral}\n```"
+            mensagem_final = f"🧠 **RELATÓRIO DE INTELIGÊNCIA DO ORÁCULO** 🧠\n\n{resumo_geral}"
             await enviar_mensagem(bot, mensagem_final)
             for noticia in noticias_para_processar:
                 salvar_link_enviado(noticia['link'])
@@ -209,9 +202,8 @@ async def ciclo_de_verificacao(bot, config):
                     Baseie-se no conteúdo a seguir, se disponível: {texto_artigo[:8000] if texto_artigo else 'Conteúdo não disponível.'}
                     """
                     resumo = resumir_com_ia(prompt_individual)
-                    # **FIX 2: Prevenção de erro de Markdown**
                     mensagem = (f"📡 **Fonte:** {noticia['source']}\n\n🔥 **{noticia['title']}**\n\n"
-                                f"🧠 **Síntese do Oráculo:**\n```\n{resumo}\n```\n\n🔗 *Link Original:* {noticia['link']}")
+                                f"🧠 **Síntese do Oráculo:**\n{resumo}\n\n🔗 *Link Original:* {noticia['link']}")
                 else: # Modo Mensageiro
                     mensagem = (f"📡 **Fonte:** {noticia['source']}\n\n"
                                 f"📰 *{noticia['title']}*\n\n"
@@ -316,4 +308,3 @@ if __name__ == "__main__":
         print("\n>>> Bot encerrado pelo usuário. <<<")
     except Exception as e:
         print(f"\n!!! Ocorreu um erro fatal: {e} !!!")
-
