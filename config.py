@@ -1,37 +1,48 @@
+<<<<<<< HEAD
 TELEGRAM_TOKEN = "8425822040:AAEfkvFb2tME8VsrjcimrHKlS31OlZExbEM"
 TELEGRAM_CHAT_ID = "7824852023" 
 GEMINI_API_KEY = "AIzaSyAOYjiRPaU5nFJ1KF5v7DFeesKDmdbH1D8" 
+=======
+
+
+TELEGRAM_TOKEN = ""
+TELEGRAM_CHAT_ID = "" 
+GEMINI_API_KEY = "" 
+>>>>>>> 04614a910895d75d6976c20ae49eed0a9e00ccf2
 
 
 
-# Lista de feeds RSS para monitorar
-# Adicione ou remova fontes conforme seu desejo
+# --- FONTES DE SABEDORIA (FEEDS RSS DE TECNOLOGIA) ---
 RSS_FEEDS = {
-    #"TechCrunch": "http://feeds.feedburner.com/TechCrunch/",
-    #"CoinDesk": "https://www.coindesk.com/arc/outboundfeeds/rss/",
-    #"Reuters Biz": "https://www.reuters.com/pf/api/v2/content/common/feeds/rss/business",
-    #"Ars Technica": "http://feeds.arstechnica.com/arstechnica/index",
-    #"Verge": "https://www.theverge.com/rss/index.xml",
-    #"globo": "https://g1.globo.com/rss/g1/tecnologia/"
+    # == Notícias Gerais de Tecnologia ==
+    "TechCrunch": "http://feeds.feedburner.com/TechCrunch/",
+    "Ars Technica": "http://feeds.arstechnica.com/arstechnica/index",
+    "The Verge": "https://www.theverge.com/rss/index.xml",
+    "WIRED": "https://www.wired.com/feed/rss",
+    "MIT Tech Review": "https://www.technologyreview.com/feed/",
 
-    #cripto RSS
-    "CoinDesk": "https://www.coindesk.com/arc/outboundfeeds/rss/",
-    "Cointelegraph": "https://cointelegraph.com/rss",
-    "The Block": "https://www.theblock.co/rss.xml",
-    "Decrypt": "https://decrypt.co/feed",
-    "Bitcoin Magazine": "https://bitcoinmagazine.com/feed",
-    "U.Today": "https://u.today/rss",
-    "CryptoSlate": "https://cryptoslate.com/feed/",
-    "BeInCrypto": "https://beincrypto.com/feed/",
-
-    #economia RSS
-    "Reuters Business": "https://www.reuters.com/pf/api/v2/content/common/feeds/rss/business",
-    "Reuters World": "https://www.reuters.com/pf/api/v2/content/common/feeds/rss/world",
-    "Wall Street Journal World": "https://feeds.a.dj.com/rss/RSSWorldNews.xml",
-    "Wall Street Journal Markets": "https://feeds.a.dj.com/rss/RSSMarketsMain.xml",
-    "Financial Times World": "https://www.ft.com/world?format=rss",
-    #"Bloomberg Markets": "https://feeds.bloomberg.com/markets/news.rss",
-    "The Economist": "https://www.economist.com/finance-and-economics/rss.xml",
-    #"Forbes": "https://www.forbes.com/business/feed/",
-    "Harvard Business Review": "https://hbr.org/rss/regular",
+    # == Foco em Desenvolvedores e Programação ==
+    "Hacker News": "https://hnrss.org/frontpage",
+    "dev.to": "https://dev.to/feed",
+    "Smashing Magazine": "https://www.smashingmagazine.com/feed/",
+    "A List Apart": "https://alistapart.com/main/feed/",
+    "Martin Fowler": "https://martinfowler.com/feed.atom",
+    
+    # == Empresas e Plataformas de Destaque ==
+    "Google Dev Blog": "https://feeds.feedburner.com/GoogleDevelopersBlog",
+    "GitHub Blog": "https://github.blog/feed/",
+    "Stack Overflow Blog": "https://stackoverflow.blog/feed/",
+    "HackerNoon": "https://hackernoon.com/feed",
+    "Netflix TechBlog": "https://netflixtechblog.com/feed", # Engenharia em escala
+    
+    # == Especializados ==
+    "InfoQ": "https://feed.infoq.com/", # Arquitetura de Software e Padrões
+    "FreeCodeCamp": "https://www.freecodecamp.org/news/rss/", # Tutoriais e aprendizado
+    "AI - Google Research": "https://blog.research.google/feeds/posts/default?alt=rss", # Novidades em IA
+    "Krebs on Security": "https://krebsonsecurity.com/feed/", # Cibersegurança
+    "DistroWatch": "https://distrowatch.com/news/dw.xml", # Novidades do mundo Linux
+    "VentureBeat": "https://feeds.feedburner.com/venturebeat/SZYF", #
 }
+
+
+

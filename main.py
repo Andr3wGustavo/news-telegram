@@ -19,7 +19,11 @@ DB_FILE = "noticias.db"
 TELEGRAM_MAX_LEN = 4096
 INTERVALO_VERIFICACAO = 3600
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+<<<<<<< HEAD
 BRASILIA_TZ = timezone(timedelta(hours=-3))
+=======
+TELEGRAM_MAX_LEN = 4096 # Limite de caracteres do Telegram
+>>>>>>> 04614a910895d75d6976c20ae49eed0a9e00ccf2
 
 # --- CONFIGURAÇÃO DAS APIS ---
 genai.configure(api_key=GEMINI_API_KEY)
@@ -133,6 +137,7 @@ def buscar_noticias_novas(time_gate=None):
     return noticias_novas
 
 async def enviar_mensagem(bot, mensagem_texto):
+<<<<<<< HEAD
     if len(mensagem_texto) <= TELEGRAM_MAX_LEN:
         try:
             await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=mensagem_texto, parse_mode='Markdown')
@@ -192,7 +197,50 @@ async def gerar_e_enviar_audio(bot, texto, titulo_audio, nome_arquivo='audio_tem
     finally:
         if os.path.exists(nome_arquivo):
             os.remove(nome_arquivo)
+=======
+    """Função genérica para enviar qualquer mensagem para o Telegram, dividindo se necessário."""
+    if len(mensagem_texto) <= TELEGRAM_MAX_LEN:
+        try:
+            await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=mensagem_texto, parse_mode='Markdown')
+            await asyncio.sleep(1)
+            return
+        except Exception as e:
+            print(f"### ERRO ao enviar com Markdown: {e} ###")
+            print("--- Tentando enviar como texto simples ---")
+            try:
+                await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=mensagem_texto)
+                await asyncio.sleep(1)
+                return
+            except Exception as e2:
+                print(f"### ERRO ao enviar como texto simples: {e2} ###")
+                if "too long" not in str(e2).lower():
+                    return
+>>>>>>> 04614a910895d75d6976c20ae49eed0a9e00ccf2
 
+    print(f"--- MENSAGEM MUITO LONGA ({len(mensagem_texto)} caracteres). Dividindo em partes. ---")
+    partes = []
+    chunk_size = TELEGRAM_MAX_LEN - 100
+    
+    for i in range(0, len(mensagem_texto), chunk_size):
+        partes.append(mensagem_texto[i:i + chunk_size])
+
+    for i, parte in enumerate(partes):
+        if len(partes) > 1:
+            parte_com_header = f"**(Parte {i+1}/{len(partes)})**\n\n{parte}"
+        else:
+            parte_com_header = parte
+
+        print(f"Enviando parte {i+1}/{len(partes)}...")
+        try:
+            await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=parte_com_header, parse_mode='Markdown')
+        except Exception as e:
+            print(f"### ERRO ao enviar parte com Markdown: {e} ###")
+            try:
+                await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=parte_com_header)
+            except Exception as e2:
+                print(f"### ERRO FATAL ao enviar parte como texto simples: {e2} ###")
+        finally:
+            await asyncio.sleep(2)
 
 async def ciclo_de_verificacao(bot, config):
     print("\n--- Iniciando novo ciclo de verificação em tempo real ---")
@@ -222,7 +270,14 @@ async def ciclo_de_verificacao(bot, config):
             batch_content = ""
             for noticia in noticias_para_processar:
                 texto_artigo = extrair_texto_artigo(noticia['link'])
+<<<<<<< HEAD
                 batch_content += f"--- Título: {noticia['title']} (Fonte: {noticia['source']})\nConteúdo: {texto_artigo[:1000] if texto_artigo else 'N/A'}\n\n"
+=======
+                if texto_artigo:
+                    batch_content += f"--- Notícia {i+1} ---\nFonte: {noticia['source']}\nTítulo: {noticia['title']}\nConteúdo: {texto_artigo[:1500]}\n\n"
+                else:
+                    batch_content += f"--- Notícia {i+1} (Conteúdo bloqueado/indisponível) ---\nFonte: {noticia['source']}\nTítulo: {noticia['title']}\n\n"
+>>>>>>> 04614a910895d75d6976c20ae49eed0a9e00ccf2
             
             prompt_lote = f"""
             Você é um analista de inteligência. A seguir está um dossiê de notícias. Sua tarefa é criar um único "Relatório de Inteligência" conciso.
@@ -239,7 +294,11 @@ async def ciclo_de_verificacao(bot, config):
             {batch_content}
             """
             resumo_geral = resumir_com_ia(prompt_lote)
+<<<<<<< HEAD
             mensagem_final = f"🧠 **RELATÓRIO DE INTELIGÊNCIA** 🧠\n\n{resumo_geral}"
+=======
+            mensagem_final = f"🧠 **RELATÓRIO DE INTELIGÊNCIA DO ORÁCULO** 🧠\n\n{resumo_geral}"
+>>>>>>> 04614a910895d75d6976c20ae49eed0a9e00ccf2
             await enviar_mensagem(bot, mensagem_final)
             await gerar_e_enviar_audio(bot, resumo_geral, "Relatório de Inteligência")
             for noticia in noticias_para_processar:
@@ -251,6 +310,7 @@ async def ciclo_de_verificacao(bot, config):
                 salvar_noticia(noticia['link'], noticia['source'], noticia['title'])
                 if config['ai_enabled']:
                     texto_artigo = extrair_texto_artigo(noticia['link'])
+<<<<<<< HEAD
                     prompt = f"Resuma esta notícia em 3 a 5 bullet points: '{noticia['title']}'. Conteúdo de apoio: {texto_artigo[:2000] if texto_artigo else 'N/A'}"
                     resumo = resumir_com_ia(prompt)
                     mensagem = f"📡 **Fonte:** {noticia['source']}\n🔥 **{noticia['title']}**\n\n{resumo}\n\n🔗 *Link Original:* {noticia['link']}"
@@ -259,6 +319,22 @@ async def ciclo_de_verificacao(bot, config):
                 else:
                     mensagem = f"📡 **Fonte:** {noticia['source']}\n📰 *{noticia['title']}*\n\n🔗 *Link:* {noticia['link']}"
                     await enviar_mensagem(bot, mensagem)
+=======
+                    prompt_individual = f"""
+                    Analise a seguinte notícia com o título "{noticia['title']}".
+                    Destile a informação em seus pontos mais essenciais e críticos em 3 a 5 bullet points (usando •).
+                    Baseie-se no conteúdo a seguir, se disponível: {texto_artigo[:8000] if texto_artigo else 'Conteúdo não disponível.'}
+                    """
+                    resumo = resumir_com_ia(prompt_individual)
+                    mensagem = (f"📡 **Fonte:** {noticia['source']}\n\n🔥 **{noticia['title']}**\n\n"
+                                f"🧠 **Síntese do Oráculo:**\n{resumo}\n\n🔗 *Link Original:* {noticia['link']}")
+                else: # Modo Mensageiro
+                    mensagem = (f"📡 **Fonte:** {noticia['source']}\n\n"
+                                f"📰 *{noticia['title']}*\n\n"
+                                f"🔗 *Link:* {noticia['link']}")
+                await enviar_mensagem(bot, mensagem)
+                salvar_link_enviado(noticia['link'])
+>>>>>>> 04614a910895d75d6976c20ae49eed0a9e00ccf2
 
     except RateLimitException:
         await enviar_mensagem(bot, "🤖 **Oráculo Informa:**\n\nO limite diário de análises da IA foi atingido.")
