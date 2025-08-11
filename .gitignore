@@ -3,7 +3,8 @@ venv/
 __pycache__/
 noticias.db
 *.pyc
-
+links_enviados.txt
+config.py
 
 
 
