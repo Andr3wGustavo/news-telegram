@@ -1,11 +1,12 @@
 # enviroment
 venv/
+
 __pycache__/
-<<<<<<< HEAD
+
 noticias.db
 =======
 config.py
->>>>>>> 04614a910895d75d6976c20ae49eed0a9e00ccf2
+
 *.pyc
 links_enviados.txt
 config.py
