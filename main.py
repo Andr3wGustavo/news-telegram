@@ -15,7 +15,7 @@ from datetime import datetime, timezone, timedelta
 
 # --- CONFIGURAÇÃO ---
 DB_FILE = "noticias.db"
-INTERVALO_VERIFICACAO = 3600
+INTERVALO_VERIFICACAO = 7200
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
 BRASILIA_TZ = timezone(timedelta(hours=-3))
 EMBED_MAX_LEN = 4000
