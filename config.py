@@ -1,15 +1,16 @@
-<<<<<<< HEAD
-TELEGRAM_TOKEN = ""
-TELEGRAM_CHAT_ID = 
-GEMINI_API_KEY =" 
-=======
 
+# config.py - Configuração para o Bot de Notícias de Criptomoedas e Economia
 
-TELEGRAM_TOKEN = ""
-TELEGRAM_CHAT_ID = "" 
-GEMINI_API_KEY = "" 
->>>>>>> 04614a910895d75d6976c20ae49eed0a9e00ccf2
+# --- CHAVES SECRETAS ---
+# 1. Crie um bot no Portal de Desenvolvedores do Discord para obter um novo token.
+# 2. Crie um canal no seu servidor e copie o ID.
+DISCORD_TOKEN = "SEU_TOKEN_DO_DISCORD_AQUI"
+DISCORD_CHANNEL_ID = SEU_ID_DO_CANAL_AQUI # Deve ser um número, sem aspas
 
+# Você pode usar a mesma chave do Gemini para todos os seus bots. 
+GEMINI_API_KEY =" "
+
+ 
 
 
 # --- FONTES DE SABEDORIA (FEEDS RSS DE TECNOLOGIA) ---
