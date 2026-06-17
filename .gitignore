@@ -1,20 +1,13 @@
-# enviroment
+# Virtual environment
 venv/
-
 __pycache__/
-
-noticias.db
-=======
-config.py
-
 *.pyc
+
+# Local databases and logs
+noticias.db
+bot_log.txt
+registros_md/
 links_enviados.txt
-config.py
 
-
-
-# config files
+# Configuration and secrets
 .env
-config.py
-links_enviados.txt
-

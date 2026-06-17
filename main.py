@@ -4,25 +4,25 @@ import discord
 from discord.ext import commands, tasks
 import feedparser
 import time
-import aiohttp # A nova ferramenta de respiração assíncrona
+import aiohttp
 import sqlite3
 import os
 import edge_tts
 from bs4 import BeautifulSoup
 import google.generativeai as genai
-from config import DISCORD_TOKEN, DISCORD_CHANNEL_ID, GEMINI_API_KEY, RSS_FEEDS
+from config import DISCORD_TOKEN, GEMINI_API_KEY, CHANNELS, RSS_FEEDS_CATEGORIZADOS
 from datetime import datetime, timezone, timedelta
 
 # --- CONFIGURAÇÃO ---
 DB_FILE = "noticias.db"
-INTERVALO_VERIFICACAO = 3600
+INTERVALO_VERIFICACAO = 7200
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
 BRASILIA_TZ = timezone(timedelta(hours=-3))
-EMBED_MAX_LEN = 4000 # Limite seguro para a descrição de um embed
+EMBED_MAX_LEN = 4000
 
 # --- CONFIGURAÇÃO DAS APIS ---
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash-latest')
+model = genai.GenerativeModel('gemini-2.5-flash')
 
 # --- CONFIGURAÇÃO DO BOT DISCORD ---
 intents = discord.Intents.default()
@@ -32,14 +32,32 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 # --- ESTADO GLOBAL DO BOT ---
 bot_state = {
     "ai_enabled": True,
-    "synthesis_mode": "batch" # 'individual' ou 'batch'
+    "synthesis_mode": "batch"
 }
 
 # --- EXCEÇÃO CUSTOMIZADA ---
 class RateLimitException(Exception):
     pass
 
-# --- FUNÇÕES DE MEMÓRIA (BANCO DE DADOS) ---
+# --- FUNÇÕES DE MEMÓRIA E ARQUIVO ---
+def salvar_em_markdown(categoria, noticias, resumo):
+    if not os.path.exists('registros_md'):
+        os.makedirs('registros_md')
+    data_hora = datetime.now(BRASILIA_TZ).strftime("%Y-%m-%d_%H-%M")
+    nome_arquivo = f"registros_md/{categoria.replace(' ', '_').replace('/', '_')}_{data_hora}.md"
+    
+    conteudo = f"# Resumo: {categoria} - {data_hora}\n\n"
+    conteudo += f"## Análise da IA\n\n{resumo}\n\n"
+    conteudo += "---\n## Notícias Coletadas\n\n"
+    for n in noticias:
+        conteudo += f"- **{n['title']}** ({n['source']})\n  Link: {n['link']}\n"
+    
+    try:
+        with open(nome_arquivo, 'w', encoding='utf-8') as f:
+            f.write(conteudo)
+    except Exception as e:
+        print(f"Erro ao salvar markdown: {e}")
+
 def setup_database():
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
@@ -119,9 +137,9 @@ def resumir_com_ia(prompt):
         return "A IA não conseguiu processar esta requisição."
 
 # --- FUNÇÕES DO BOT ---
-def buscar_noticias_novas(time_gate=None):
+def buscar_noticias_novas(feeds, time_gate=None):
     noticias_novas = []
-    for nome_fonte, url_feed in RSS_FEEDS.items():
+    for nome_fonte, url_feed in feeds.items():
         print(f"Verificando feed: {nome_fonte}...")
         feed = feedparser.parse(url_feed)
         if not feed.entries: continue
@@ -157,12 +175,12 @@ async def gerar_e_enviar_audio(channel, texto, titulo_audio, nome_arquivo='audio
         if os.path.exists(nome_arquivo):
             os.remove(nome_arquivo)
 
-async def processar_noticias_encontradas(channel, noticias):
+async def processar_noticias_encontradas(channel, noticias, categoria):
     if not noticias:
         print("Nenhuma notícia nova para processar.")
         return
 
-    print(f"Encontradas {len(noticias)} notícias novas. Processando no modo '{bot_state['synthesis_mode']}'...")
+    print(f"Encontradas {len(noticias)} notícias novas. Processando no Modo Analista...")
     try:
         batch_content = ""
         for noticia in noticias:
@@ -170,7 +188,7 @@ async def processar_noticias_encontradas(channel, noticias):
             batch_content += f"--- Título: {noticia['title']} (Fonte: {noticia['source']})\nConteúdo: {texto_artigo[:1000] if texto_artigo else 'N/A'}\n\n"
         
         prompt = f"""
-        Você é um analista de inteligência. A seguir está um dossiê de notícias. Sua tarefa é criar um único "Relatório de Inteligência" conciso.
+        Você é um analista de inteligência. A seguir está um dossiê de notícias da categoria "{categoria}". Sua tarefa é criar um único "Relatório de Inteligência" conciso.
 
         1.  **Síntese Geral:** Comece com um parágrafo curto que resuma o cenário geral das notícias.
         1.1 **Para cada notícia que julgar importante, seja mais detalhista.**
@@ -184,6 +202,9 @@ async def processar_noticias_encontradas(channel, noticias):
         {batch_content}
         """
         resumo = resumir_com_ia(prompt)
+        
+        # Salva o resumo localmente
+        salvar_em_markdown(categoria, noticias, resumo)
         
         if len(resumo) <= EMBED_MAX_LEN:
             embed = discord.Embed(title="🧠 Relatório de Inteligência do Oráculo", description=f"```\n{resumo}\n```", color=0x00ff00)
@@ -199,7 +220,7 @@ async def processar_noticias_encontradas(channel, noticias):
                 await channel.send(embed=embed)
                 await asyncio.sleep(1)
 
-        await gerar_e_enviar_audio(channel, resumo, "Relatório de Inteligência")
+        await gerar_e_enviar_audio(channel, resumo, f"Relatório de Inteligência - {categoria}")
         
         for noticia in noticias:
             salvar_noticia(noticia['link'], noticia['source'], noticia['title'])
@@ -208,14 +229,34 @@ async def processar_noticias_encontradas(channel, noticias):
         await channel.send("🤖 **Oráculo Informa:**\n\nO limite diário de análises da IA foi atingido.")
 
 # --- TAREFAS EM SEGUNDO PLANO (LOOPS) ---
-@tasks.loop(hours=1)
-async def ciclo_de_verificacao_horaria():
-    print("\n--- Iniciando ciclo de verificação horária ---")
-    channel = bot.get_channel(DISCORD_CHANNEL_ID)
-    if not channel: return
-    noticias = buscar_noticias_novas()
-    if noticias:
-        await processar_noticias_encontradas(channel, noticias)
+@tasks.loop(hours=2)
+async def ciclo_de_verificacao():
+    # MUDANÇA: Adicionada a lógica de vigília e repouso.
+    agora_brasilia = datetime.now(BRASILIA_TZ)
+    if not (6 <= agora_brasilia.hour < 22):
+        print(f"({agora_brasilia.strftime('%H:%M')}) Oráculo em modo de repouso. Próxima vigília às 06:00.")
+        return
+
+    print(f"\n({agora_brasilia.strftime('%H:%M')}) --- Iniciando ciclo de verificação (a cada 2h) ---")
+    
+    for categoria, feeds in RSS_FEEDS_CATEGORIZADOS.items():
+        print(f"--- Processando Categoria: {categoria} ---")
+        channel_id = CHANNELS.get(categoria, 0)
+        if not channel_id:
+            print(f"Aviso: Canal para a categoria '{categoria}' não configurado. Pulando...")
+            continue
+        
+        channel = bot.get_channel(channel_id)
+        if not channel:
+            print(f"Aviso: Não foi possível acessar o canal ID {channel_id} para '{categoria}'.")
+            continue
+            
+        noticias = buscar_noticias_novas(feeds)
+        if noticias:
+            await processar_noticias_encontradas(channel, noticias, categoria)
+        else:
+            print(f"Sem notícias novas para {categoria}.")
+        await asyncio.sleep(2) # Pequena pausa entre categorias
 
 @tasks.loop(hours=1)
 async def checar_resumo_diario():
@@ -224,7 +265,10 @@ async def checar_resumo_diario():
     
     if agora_brasilia.hour == 22 and not resumo_diario_ja_enviado(data_hoje):
         print("\n" + "="*50 + "\n!!! HORA DO BRIEFING DIÁRIO !!!\n" + "="*50)
-        channel = bot.get_channel(DISCORD_CHANNEL_ID)
+        # Envia no canal da primeira categoria disponível ou em todos? 
+        # Vamos enviar no principal (Cripto e Economia) para evitar spam em todos.
+        channel_id = CHANNELS.get("Cripto e Economia", 0)
+        channel = bot.get_channel(channel_id)
         if not channel: return
         
         noticias_do_dia = buscar_noticias_diarias()
@@ -241,103 +285,60 @@ async def checar_resumo_diario():
         marcar_resumo_diario_como_enviado(data_hoje)
         print("--- BRIEFING DIÁRIO ENVIADO ---")
 
-# --- PAINEL DE CONTROLE INTERATIVO ---
-class PainelDeControle(discord.ui.View):
-    def __init__(self):
-        # MUDANÇA: timeout=None torna a view persistente
-        super().__init__(timeout=None)
-
-    # MUDANÇA: Adicionado custom_id para cada botão
-    @discord.ui.button(label="Modo Analista", style=discord.ButtonStyle.green, custom_id="persist_analista")
-    async def modo_analista(self, interaction: discord.Interaction, button: discord.ui.Button):
-        bot_state['ai_enabled'] = True
-        bot_state['synthesis_mode'] = 'batch'
-        await interaction.response.send_message("✅ **Confirmado.** Oráculo agora opera em **Modo Analista**.", ephemeral=True)
-
-    @discord.ui.button(label="Modo Jornalista", style=discord.ButtonStyle.primary, custom_id="persist_jornalista")
-    async def modo_jornalista(self, interaction: discord.Interaction, button: discord.ui.Button):
-        bot_state['ai_enabled'] = True
-        bot_state['synthesis_mode'] = 'individual'
-        await interaction.response.send_message("✅ **Confirmado.** Oráculo agora opera em **Modo Jornalista**.", ephemeral=True)
-
-    @discord.ui.button(label="Modo Mensageiro", style=discord.ButtonStyle.grey, custom_id="persist_mensageiro")
-    async def modo_mensageiro(self, interaction: discord.Interaction, button: discord.ui.Button):
-        bot_state['ai_enabled'] = False
-        await interaction.response.send_message("✅ **Confirmado.** Análise de IA desativada.", ephemeral=True)
-
 # --- EVENTOS E COMANDOS DO DISCORD ---
+class ScanButton(discord.ui.Button):
+    def __init__(self, categoria):
+        super().__init__(label=f"Escanear {categoria}", style=discord.ButtonStyle.success, custom_id=f"scan_{categoria}")
+        self.categoria = categoria
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.send_message(f"🤖 Iniciando scan manual para **{self.categoria}**...", ephemeral=True)
+        feeds = RSS_FEEDS_CATEGORIZADOS.get(self.categoria, {})
+        channel_id = CHANNELS.get(self.categoria, 0)
+        if channel_id == 0:
+            await interaction.followup.send(f"❌ Canal para {self.categoria} não configurado.", ephemeral=True)
+            return
+            
+        channel = bot.get_channel(channel_id)
+        if not channel:
+            await interaction.followup.send(f"❌ Canal para {self.categoria} não encontrado.", ephemeral=True)
+            return
+
+        noticias = buscar_noticias_novas(feeds)
+        if not noticias:
+            await interaction.followup.send(f"✅ Scan concluído. Nenhuma notícia nova para {self.categoria}.", ephemeral=True)
+        else:
+            await interaction.followup.send(f"✅ Encontradas {len(noticias)} notícias novas para {self.categoria}. Processando e enviando para o canal correspondente...", ephemeral=True)
+            await processar_noticias_encontradas(channel, noticias, self.categoria)
+
+class PainelView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        for categoria in RSS_FEEDS_CATEGORIZADOS.keys():
+            self.add_item(ScanButton(categoria))
+
 @bot.event
 async def on_ready():
     print(f'O Oráculo despertou e está online como {bot.user}')
-    print('Aguardando o comando !iniciar para começar a vigília.')
-    bot.add_view(PainelDeControle())
+    bot.add_view(PainelView()) # Persistir botões após reinício
+    try:
+        synced = await bot.tree.sync()
+        print(f"Sincronizados {len(synced)} comandos em barra (Slash Commands).")
+    except Exception as e:
+        print(f"Erro ao sincronizar comandos em barra: {e}")
+    ciclo_de_verificacao.start()
     checar_resumo_diario.start()
 
-# --- MODAL PARA INÍCIO SUAVE ---
-class SoftStartModal(discord.ui.Modal, title='Início Suave'):
-    minutes = discord.ui.TextInput(label='Quantos minutos no passado verificar?', placeholder='Ex: 30')
+@bot.tree.command(name='painel', description='Envia o painel interativo para escanear categorias manualmente.')
+async def painel(interaction: discord.Interaction):
+    embed = discord.Embed(title="🎛️ Painel de Controle do Oráculo", description="Clique em um botão para forçar uma verificação manual de uma categoria específica.", color=0x00A2E8)
+    if interaction.client.user and interaction.client.user.display_avatar:
+        embed.set_thumbnail(url=interaction.client.user.display_avatar.url)
+    await interaction.response.send_message(embed=embed, view=PainelView())
 
-    async def on_submit(self, interaction: discord.Interaction):
-        try:
-            minutos = int(self.minutes.value)
-            if minutos <= 0:
-                await interaction.response.send_message("Por favor, insira um número positivo.", ephemeral=True)
-                return
-            
-            await interaction.response.send_message(f"✅ **Ordem recebida!** Iniciando vigília com uma busca nos últimos {minutos} minutos...", ephemeral=True)
-            
-            time_gate = datetime.now(timezone.utc) - timedelta(minutes=minutos)
-            noticias = buscar_noticias_novas(time_gate)
-            if noticias:
-                await processar_noticias_encontradas(interaction.channel, noticias)
-            
-            if not ciclo_de_verificacao_horaria.is_running():
-                ciclo_de_verificacao_horaria.start()
-
-        except ValueError:
-            await interaction.response.send_message("Entrada inválida. Por favor, insira um número.", ephemeral=True)
-
-# --- VIEW PARA O COMANDO INICIAR ---
-class IniciarView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=180) # Botões desaparecem após 3 minutos
-
-    @discord.ui.button(label="Padrão", style=discord.ButtonStyle.green)
-    async def padrao(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("✅ **Ordem recebida!** Iniciando vigília no modo padrão...", ephemeral=True)
-        noticias = buscar_noticias_novas()
-        if noticias:
-            await processar_noticias_encontradas(interaction.channel, noticias)
-        if not ciclo_de_verificacao_horaria.is_running():
-            ciclo_de_verificacao_horaria.start()
-
-    @discord.ui.button(label="Início Suave", style=discord.ButtonStyle.primary)
-    async def inicio_suave(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_modal(SoftStartModal())
-
-    @discord.ui.button(label="Sincronizar", style=discord.ButtonStyle.secondary)
-    async def sincronizar(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("✅ **Ordem recebida!** Sincronizando a memória. Isso pode levar um momento...", ephemeral=True)
-        noticias = buscar_noticias_novas()
-        if noticias:
-            for n in noticias:
-                salvar_noticia(n['link'], n['source'], n['title'])
-            await interaction.followup.send(f"Sincronização completa. {len(noticias)} notícias arquivadas. Iniciando vigília...", ephemeral=True)
-        else:
-            await interaction.followup.send("Memória já está em dia. Iniciando vigília...", ephemeral=True)
-        
-        if not ciclo_de_verificacao_horaria.is_running():
-            ciclo_de_verificacao_horaria.start()
-
-@bot.command(name='iniciar')
-async def iniciar_vigilia(ctx):
-    """Inicia a vigília do Oráculo com opções de busca."""
-    if ciclo_de_verificacao_horaria.is_running():
-        await ctx.send("A vigília horária já está ativa.")
-        return
-    
-    embed = discord.Embed(title="Ordem de Despertar", description="Mestre, como devo iniciar minha vigília?", color=0x7289DA)
-    await ctx.send(embed=embed, view=IniciarView())
+@bot.tree.command(name='verificar', description='Avisa sobre o comando /painel.')
+async def manual_check(interaction: discord.Interaction):
+    await interaction.response.send_message("🤖 **Atenção:** O comando `/verificar` foi substituído pelo comando `/painel`. Use `/painel` para abrir o dashboard e escolher qual categoria deseja escanear.", ephemeral=True)
 
 # --- PONTO DE ENTRADA ---
 if __name__ == "__main__":
