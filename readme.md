@@ -1,1 +1,1 @@
-news bot
+news bot using discord 
